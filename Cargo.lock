@@ -1012,6 +1012,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusync"
+version = "0.1.0"
+dependencies = [
+ "base16",
+ "md5",
+ "rust-s3",
+ "scan_dir",
+ "url",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.5"
 source = "registry+git://mirrors.ustc.edu.cn/crates.io-index"
@@ -1298,18 +1309,6 @@ name = "try-lock"
 version = "0.2.3"
 source = "registry+git://mirrors.ustc.edu.cn/crates.io-index"
 checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
-
-[[package]]
-name = "tsync"
-version = "0.1.0"
-dependencies = [
- "base16",
- "md5",
- "rand",
- "rust-s3",
- "scan_dir",
- "url",
-]
 
 [[package]]
 name = "typenum"

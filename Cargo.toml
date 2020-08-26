@@ -1,12 +1,11 @@
 [package]
-name = "tsync"
+name = "rusync"
 version = "0.1.0"
 authors = ["jiangplus <jiang.plus.times@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 rust-s3 = "0.22.12"
-rand = "0.7.3"
 url = "2.1.1"
 md5 = "0.7.0"
 base16 = "0.2.1"
