@@ -41,8 +41,8 @@ pub fn main() -> Result<(), S3Error> {
     let endpoint = env::var("AWS_HOST").unwrap();
 
     let args: Vec<String> = env::args().collect();
-    let source = &args[1];
-    let dest = &args[2];
+    let source = &args[2];
+    let dest = &args[3];
 
     let aws = Storage {
         region: Region::Custom {
