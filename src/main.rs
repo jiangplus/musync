@@ -40,8 +40,41 @@ fn main() {
             .subcommand(SubCommand::with_name("msync")
                 .about("Synchronize multiple directories to S3")
                 .arg(Arg::with_name("source_dest")
+                .multiple(true)
                 .help("source and dest pair")))
             .get_matches();
 
-    println!("{:?}", matches);
+    // println!("{:?}", matches.subcommand);
+
+    match matches.subcommand() {
+        ("ls",  Some(sub)) => {
+          let uri = &sub.args["uri"].vals[0];
+          println!("{:?}", uri);
+        },
+        ("get",  Some(sub)) => {
+          let source = &sub.args["source"].vals[0];
+          let dest = &sub.args["dest"].vals[0];
+          println!("{:?}", source);
+        },
+        ("put",  Some(sub)) => {
+          let source = &sub.args["source"].vals[0];
+          let dest = &sub.args["dest"].vals[0];
+          println!("{:?}", source);
+        },
+        ("rm",  Some(sub)) => {
+          let source = &sub.args["uri"].vals[0];
+        },
+        ("info",  Some(sub)) => {
+          let source = &sub.args["uri"].vals[0];
+        },
+        ("sync",  Some(sub)) => {
+          let source = &sub.args["source"].vals[0];
+          let dest = &sub.args["dest"].vals[0];
+        },
+        ("msync",  Some(sub)) => {
+          let source_dest = &sub.args["source_dest"].vals[0];
+        },
+        _             => {},
+    }
+
 }
