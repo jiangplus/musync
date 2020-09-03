@@ -213,10 +213,49 @@ fn get_object(source: &OsString, dest: &OsString) -> Result<(), S3Error> {
 }
 
 fn put_object(source: &OsString, dest: &OsString) -> Result<(), S3Error> {
-    // let region_name = env::var("AWS_REGION").unwrap();
-    // let endpoint = env::var("AWS_HOST").unwrap();
+    let region = Region::Custom {
+        region: env::var("AWS_REGION").unwrap().into(),
+        endpoint: env::var("AWS_HOST").unwrap().into(),
+    };
+    let credentials = Credentials::from_env_specific(
+        Some("AWS_ACCESS_KEY_ID"),
+        Some("AWS_SECRET_ACCESS_KEY"),
+        None,
+        None,
+    )?;
+    let source = source.to_str().unwrap();
+    let dest = dest.to_str().unwrap();
+    if !dest.starts_with("s3://") {
+      panic!("{:?} is not s3 path", dest);
+    }
+
+    let parsed = Url::parse(dest)?;
+    let bucket_name = parsed.host().unwrap().to_string();
+    let raw_path = parsed.path();
+    let path = raw_path.trim_start_matches("/").trim_end_matches("/");
+    let local_file_path = source;
+    println!("bucket {}", bucket_name);
+    println!("raw_path {}", raw_path);
+    println!("path {}", path);
+    println!("local_file_path {}", source);
+
+    let bucket = Bucket::new(&bucket_name, region, credentials)?;
+
+    let md = metadata(local_file_path).unwrap();
+    if !md.is_file() {
+        panic!("{:?} is not file", local_file_path);
+    }
+
+    let metadata = fs::metadata(&local_file_path).expect("unable to read file");
+    let mut buffer = vec![0; metadata.len() as usize];
+    let mut file = File::open(&local_file_path).unwrap();
+    file.read(&mut buffer).expect("buffer overflow");
     
-  println!("{:?}", source);
+    // todo : streaming upload
+    let status_code = bucket.put_object_blocking(path, &buffer, "application/octet-stream").unwrap();
+    println!("result: {}", status_code.1);
+
+    println!("{:?}", source);
     Ok(())
 }
 
@@ -224,7 +263,7 @@ fn remove_object(uri: &OsString) -> Result<(), S3Error> {
     // let region_name = env::var("AWS_REGION").unwrap();
     // let endpoint = env::var("AWS_HOST").unwrap();
     
-  println!("{:?}", uri);
+    println!("{:?}", uri);
     Ok(())
 }
 
@@ -232,7 +271,7 @@ fn show_object(uri: &OsString) -> Result<(), S3Error> {
     // let region_name = env::var("AWS_REGION").unwrap();
     // let endpoint = env::var("AWS_HOST").unwrap();
     
-  println!("{:?}", uri);
+    println!("{:?}", uri);
     Ok(())
 }
 
@@ -240,22 +279,22 @@ fn sync_dir(source: &OsString, dest: &OsString) -> Result<(), S3Error> {
     // let region_name = env::var("AWS_REGION").unwrap();
     // let endpoint = env::var("AWS_HOST").unwrap();
     
-  println!("{:?}", source);
+    println!("{:?}", source);
     Ok(())
 }
 
 fn sync_dirs(source_dest: &OsString) -> Result<(), S3Error> {
-  println!("{:?}", source_dest);
+    println!("{:?}", source_dest);
     Ok(())
 }
 
 pub fn checkfile(file_name: &Path, expected_hash: &str) -> bool {
-  let mut file = File::open(file_name).unwrap();
-  let mut md5_context = md5::Context::new();
-  io::copy(&mut file, &mut md5_context).unwrap();
-  let hash = md5_context.compute();
-  let hash = base16::encode_lower(&hash.0);
-  return hash == expected_hash
+    let mut file = File::open(file_name).unwrap();
+    let mut md5_context = md5::Context::new();
+    io::copy(&mut file, &mut md5_context).unwrap();
+    let hash = md5_context.compute();
+    let hash = base16::encode_lower(&hash.0);
+    return hash == expected_hash
 }
 
 
