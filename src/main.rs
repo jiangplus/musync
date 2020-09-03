@@ -109,8 +109,16 @@ fn main() {
           sync_dir(source, dest);
         },
         ("msync",  Some(sub)) => {
-          let source_dest = &sub.args["source_dest"].vals[0];
-          sync_dirs(source_dest);
+          let items = &sub.args["source_dest"].vals;
+          for item in items {
+            let pair:Vec<&str> = item.to_str().unwrap().split(":::").collect();
+            // println!("{:?}", pair);
+            // todo : pass string directly
+            let source = OsString::from(pair[0]);
+            let dest = OsString::from(pair[1]);
+            sync_dir(&source, &dest);
+          }
+
         },
         _             => {},
     }
@@ -118,7 +126,7 @@ fn main() {
 }
 
 fn list_bucket(uri: &OsString) -> Result<(), S3Error> {
-    println!("{:?}", uri);
+    // println!("{:?}", uri);
 
     let region = Region::Custom {
         region: env::var("AWS_REGION").unwrap().into(),
@@ -139,16 +147,16 @@ fn list_bucket(uri: &OsString) -> Result<(), S3Error> {
     let bucket_name = parsed.host().unwrap().to_string();
     let raw_path = parsed.path();
     let path = raw_path.trim_start_matches("/").to_string();
-    println!("bucket {}", bucket_name);
-    println!("raw_path {}", raw_path);
-    println!("path {}", path);
+    // println!("bucket {}", bucket_name);
+    // println!("raw_path {}", raw_path);
+    // println!("path {}", path);
 
     let bucket = Bucket::new(&bucket_name, region, credentials)?;
 
     let results = bucket.list_blocking(path, Some("/".to_string()))?;
     for (list, code) in results {
         assert_eq!(200, code);
-        println!("{:?}", list);
+        // println!("{:?}", list);
         if let Some(common_prefixes) = list.common_prefixes {
           for comm in common_prefixes {
             println!("dir s3://{}/{}", bucket_name, comm.prefix);
@@ -185,10 +193,10 @@ fn get_object(source: &OsString, dest: &OsString) -> Result<(), S3Error> {
     let path = raw_path.trim_start_matches("/").to_string();
     let dest = dest.to_str().unwrap();
     let local_file_path = dest;
-    println!("bucket {}", bucket_name);
-    println!("raw_path {}", raw_path);
-    println!("path {}", path);
-    println!("local_file_path {}", dest);
+    // println!("bucket {}", bucket_name);
+    // println!("raw_path {}", raw_path);
+    // println!("path {}", path);
+    // println!("local_file_path {}", dest);
 
     let bucket = Bucket::new(&bucket_name, region, credentials)?;
 
@@ -208,7 +216,6 @@ fn get_object(source: &OsString, dest: &OsString) -> Result<(), S3Error> {
     };
     let code = bucket.get_object_stream_blocking(&path, &mut output_file).unwrap();
     println!("Code: {}", code);
-    println!("{:?}", source);
     Ok(())
 }
 
@@ -234,10 +241,10 @@ fn put_object(source: &OsString, dest: &OsString) -> Result<(), S3Error> {
     let raw_path = parsed.path();
     let path = raw_path.trim_start_matches("/").trim_end_matches("/");
     let local_file_path = source;
-    println!("bucket {}", bucket_name);
-    println!("raw_path {}", raw_path);
-    println!("path {}", path);
-    println!("local_file_path {}", source);
+    // println!("bucket {}", bucket_name);
+    // println!("raw_path {}", raw_path);
+    // println!("path {}", path);
+    // println!("local_file_path {}", source);
 
     let bucket = Bucket::new(&bucket_name, region, credentials)?;
 
@@ -255,7 +262,6 @@ fn put_object(source: &OsString, dest: &OsString) -> Result<(), S3Error> {
     let status_code = bucket.put_object_blocking(path, &buffer, "application/octet-stream").unwrap();
     println!("result: {}", status_code.1);
 
-    println!("{:?}", source);
     Ok(())
 }
 
@@ -276,10 +282,164 @@ fn show_object(uri: &OsString) -> Result<(), S3Error> {
 }
 
 fn sync_dir(source: &OsString, dest: &OsString) -> Result<(), S3Error> {
-    // let region_name = env::var("AWS_REGION").unwrap();
-    // let endpoint = env::var("AWS_HOST").unwrap();
-    
-    println!("{:?}", source);
+    let region = Region::Custom {
+        region: env::var("AWS_REGION").unwrap().into(),
+        endpoint: env::var("AWS_HOST").unwrap().into(),
+    };
+    let credentials = Credentials::from_env_specific(
+        Some("AWS_ACCESS_KEY_ID"),
+        Some("AWS_SECRET_ACCESS_KEY"),
+        None,
+        None,
+    )?;
+
+    let source = source.to_str().unwrap();
+    let dest = dest.to_str().unwrap();
+
+    if source.starts_with("s3://") && dest.starts_with("s3://") {
+      println!("both s3 address not supported");
+    } else if source.starts_with("s3://") {
+      println!("downsync");
+
+      let parsed = Url::parse(source)?;
+      let bucket_name = parsed.host().unwrap().to_string();
+      let raw_path = parsed.path();
+      let path = raw_path.trim_start_matches("/");
+      let local_dir = dest;
+      // println!("bucket {}", bucket_name);
+      // println!("raw_path {}", raw_path);
+      // println!("path {}", path);
+      // println!("local_dir {}", dest);
+
+      let bucket = Bucket::new(&bucket_name, region, credentials)?;
+
+      let results = bucket.list_blocking(path.to_string(), None)?;
+      for (list, code) in results {
+          assert_eq!(200, code);
+
+          for obj in list.contents {
+              // println!("\n");
+              let e_tag = obj.e_tag.trim_start_matches("\"").trim_end_matches("\"");
+              
+              // println!("{:?}", obj);
+              // println!("etag {}", e_tag);
+              let sub_path = obj.key.trim_start_matches(path);
+              // println!("key {}", obj.key);
+              let local_file_path = 
+                if raw_path.ends_with("/") {
+                    Path::new(local_dir).join(sub_path)
+                } else {
+                    let mid_path = Path::new(path).file_name().unwrap().to_str().unwrap();
+                    Path::new(local_dir).join([mid_path, sub_path].concat())
+                };
+              let local_file_dir = Path::new(&local_file_path).parent().unwrap();
+              // println!("local_file_path {:?}", local_file_path);
+              // println!("local_file_dir {:?}", local_file_dir);
+
+              if Path::new(&local_file_path).exists() && checkfile(&local_file_path, e_tag) {
+                println!("skip {:?} -> {:?}", obj.key, local_file_path);
+              } else {
+                let mut output_file = match File::create(&local_file_path) {
+                    Ok(file) => file,
+                    Err(error) => match error.kind() {
+                        ErrorKind::NotFound => {
+                          fs::create_dir_all(&local_file_dir)?;
+                          File::create(&local_file_path).unwrap()
+                        },
+                        other_error => {
+                            panic!("Problem opening the file: {:?}", other_error)
+                        }
+                    },
+                };
+
+                let code = bucket.get_object_stream_blocking(&obj.key, &mut output_file).unwrap();
+                println!("Code: {}", code);
+              }
+          }
+      }
+
+    } else if dest.starts_with("s3://") {
+      println!("upsync");
+
+      let parsed = Url::parse(dest)?;
+      let bucket_name = parsed.host().unwrap().to_string();
+      let raw_path = parsed.path();
+      let path = raw_path.trim_start_matches("/").trim_end_matches("/");
+      let local_dir = source;
+      // println!("bucket {}", bucket_name);
+      // println!("raw_path {}", raw_path);
+      // println!("path {}", path);
+      // println!("local_dir {}", source);
+
+      let bucket = Bucket::new(&bucket_name, region, credentials)?;
+
+      // todo : check whether local file hash match remote file
+      // for obj in &list.contents {
+      //     println!("\n");
+      //     let sub_path = obj.key.trim_start_matches(path);
+      //     println!("key {}", obj.key);
+      // }
+
+      let dirname = Path::new(local_dir).file_name().unwrap().to_str().unwrap();
+      let path_and_dirname = Path::new(path).join(dirname);
+      let path_and_dirname = path_and_dirname.to_str().unwrap();
+
+      let path_and_slash = [path, "/"].concat();
+      let path_and_slash = path_and_slash.as_str();
+      let remote_dir = if source.ends_with("/") {
+        path_and_slash
+      } else {
+        path_and_dirname
+      };
+      // println!("remote_dir {}", remote_dir);
+
+      let md = metadata(local_dir).unwrap();
+      if md.is_file() {
+        // println!("local_dir {:?}", local_dir);
+        // println!("remove_path {:?}", path);
+        // todo : single file upload
+        println!("file");
+
+        let metadata = fs::metadata(&local_dir).expect("unable to read file");
+        let mut buffer = vec![0; metadata.len() as usize];
+        let mut file = File::open(&local_dir).unwrap();
+        file.read(&mut buffer).expect("buffer overflow");
+        
+        // todo : streaming upload
+        let status_code = bucket.put_object_blocking(path, &buffer, "application/octet-stream").unwrap();
+        println!("result: {}", status_code.1);
+
+      } else {
+        let _all_files: Vec<_> = ScanDir::files().walk(local_dir, |iter| {
+            iter.map(|(ref entry, _)| {
+              let entry_path = entry.path();
+              // println!("entry_path {:?}", entry_path);
+              let entry_remote_path = entry_path.to_str().unwrap().trim_start_matches(local_dir);
+              let entry_remote_path = [remote_dir, entry_remote_path].concat();
+              // println!("entry_remote_path2 {:?}", entry_remote_path);
+              let entry_remote_path = entry_remote_path.as_str();
+              // println!("upload {:?} -> {:?}", entry_path, entry_remote_path);
+              // println!("entry_remote_path {:?}, entry_path {:?}", &entry_remote_path, &entry_path);
+
+              let metadata = fs::metadata(&entry_path).expect("unable to read metadata");
+              let mut buffer = vec![0; metadata.len() as usize];
+              let mut file = File::open(&entry_path).unwrap();
+              file.read(&mut buffer).expect("buffer overflow");
+              
+
+              // todo : streaming upload
+              let status_code = bucket.put_object_blocking(entry_remote_path, &buffer, "application/octet-stream").unwrap();
+              println!("result: {}", status_code.1);
+
+              entry.path()
+            }).collect()
+        }).unwrap();
+      }
+
+    } else {
+      println!("both local address not supported");
+    }
+
     Ok(())
 }
 
