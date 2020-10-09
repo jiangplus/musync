@@ -1,4 +1,4 @@
-### rusync
+### musync
 
 simple s3 sync tool in rust
 
@@ -14,17 +14,17 @@ simple s3 sync tool in rust
 
 ### commands
 
-  rusync ls s3://bucket/path
+  musync ls s3://bucket/path
 
-  rusync get s3://bucket/path local_path
+  musync get s3://bucket/path local_path
   
-  rusync put local_path s3://bucket/path
+  musync put local_path s3://bucket/path
 
-  rusync sync local_data s3://bucket/path
+  musync sync local_data s3://bucket/path
   
-  rusync sync s3://bucket/path local_data
+  musync sync s3://bucket/path local_data
 
-  rusync msync s3://bucket/path:::local_data s3://bucket/path:::local_data
+  musync msync s3://bucket/path:::local_data s3://bucket/path:::local_data
 
 `msync` is the command to sync multiple destinations at once, which acts the same as calling `sync` multiple times, each pair is concatenate by `:::`
 

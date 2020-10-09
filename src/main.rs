@@ -1,5 +1,5 @@
 extern crate clap;
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg, SubCommand, AppSettings};
 
 use std::env;
 use std::fs;
@@ -64,9 +64,10 @@ pub fn checkfile(file_name: &Path, expected_hash: &str) -> bool {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let matches = App::new("musync")
+        .setting(AppSettings::ArgRequiredElseHelp)
         .version("0.5")
-        .author("jiangplus")
-        .about("s3 sync tools in rust")
+        .about("s3 sync tools in rust, provide credentials by setting envs: AWS_REGION, AWS_HOST, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY")
+        // .help("provide credentials by setting envs: AWS_REGION, AWS_HOST, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY")
         .subcommand(
             SubCommand::with_name("ls")
                 .about("List bucket or objects")
@@ -114,24 +115,26 @@ async fn main() -> std::io::Result<()> {
     match matches.subcommand() {
         ("ls", Some(sub)) => {
             let uri = &sub.args["uri"].vals[0].to_str().unwrap();
-            list_bucket(uri).await;
+            list_bucket(uri).await.expect("Failed to list objects");
         },
         ("get", Some(sub)) => {
             let source = &sub.args["source"].vals[0].to_str().unwrap();
             let dest = &sub.args["dest"].vals[0].to_str().unwrap();
-            get_object(source, dest).await;
+            get_object(source, dest).await.expect("Failed to get object");
         }
         ("put", Some(sub)) => {
             let source = &sub.args["source"].vals[0].to_str().unwrap();
             let dest = &sub.args["dest"].vals[0].to_str().unwrap();
-            put_object(source, dest).await;
+            put_object(source, dest).await.expect("Failed to put object");
         }
         ("sync", Some(sub)) => {
             let source = &sub.args["source"].vals[0].to_str().unwrap();
             let dest = &sub.args["dest"].vals[0].to_str().unwrap();
-            sync_dir(source, dest).await;
+            sync_dir(source, dest).await.expect("Failed to sync objects");
         }
-        _ => {}
+        _ => {
+            println!("{:?}", matches);
+        }
 
     }
 
@@ -183,8 +186,6 @@ async fn list_bucket(uri: &str) -> Result<(), url::ParseError> {
 
     Ok(())
 }
-
-
 
 async fn get_object(source: &str, dest: &str) -> Result<(), url::ParseError> {
     if !source.starts_with("s3://") {
@@ -266,8 +267,6 @@ async fn put_object(source: &str, dest: &str) -> Result<(), url::ParseError> {
     Ok(())
 }
 
-
-
 async fn sync_dir(source: &str, dest: &str) -> Result<(), url::ParseError> {
     let client = SyncClient::new_from_env().client;
 
@@ -281,7 +280,6 @@ async fn sync_dir(source: &str, dest: &str) -> Result<(), url::ParseError> {
         let raw_path = parsed.path();
         let path = raw_path.trim_start_matches("/");
         let local_dir = dest;
-        println!("local_dir: {:?}", local_dir);
 
         let list_obj_req_v2 = ListObjectsV2Request {
             bucket: bucket_name.clone(),
@@ -291,8 +289,7 @@ async fn sync_dir(source: &str, dest: &str) -> Result<(), url::ParseError> {
         let resp = client
             .list_objects_v2(list_obj_req_v2)
             .await
-            .expect("failed to list objects v2");
-        println!("{:?}", resp);
+            .expect("failed to list objects");
         println!("");
 
         if let Some(objs) = &resp.contents {
@@ -379,8 +376,8 @@ async fn sync_dir(source: &str, dest: &str) -> Result<(), url::ParseError> {
 
             let mut file = File::open(&local_dir).unwrap();
             let mut buffer = vec![0; md.len() as usize];
-            file.read(&mut buffer).expect("buffer overflow");
             // todo : streaming upload
+            file.read(&mut buffer).expect("buffer overflow");
 
             let put_request = PutObjectRequest {
                 bucket: bucket_name.clone(),
@@ -425,10 +422,10 @@ async fn sync_dir(source: &str, dest: &str) -> Result<(), url::ParseError> {
                 };
 
                 // todo : fix files/ upload form
-                let resp = client
+                client
                     .put_object(put_request)
                     .await
-                    .expect("Failed to put test object");
+                    .expect("Failed to put object");
             };
 
         }
