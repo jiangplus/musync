@@ -26,15 +26,7 @@ simple s3 sync tool in rust
 
   rusync msync s3://bucket/path:::local_data s3://bucket/path:::local_data
 
-`msync` is the command to sync multiple destinations at once, which acts the same as calling `sync` in multiple times, each pair is concatenate by `:::`
-
-### Todo
-
-Currently object streaming upload is not working, data has to be read into buffer.
-
-See `https://github.com/durch/rust-s3/issues/106`.
-
-Use `https://github.com/rusoto/rusoto` as aws sdk in the future
+`msync` is the command to sync multiple destinations at once, which acts the same as calling `sync` multiple times, each pair is concatenate by `:::`
 
 ### License
 
